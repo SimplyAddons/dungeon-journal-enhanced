@@ -1,6 +1,7 @@
 -- Dungeon Journal Enhanced
 -- Adds a sort button (level / name) and a grid/list toggle to DungeonJournal's
 -- home page, next to Hide Dungeons. The < > dungeon arrows follow the sort too.
+-- Right-clicking a dungeon card gives a menu to hide it.
 --
 -- Doesn't touch DJ's files. DJ calls FDJ.UpdateRPGHeader(frame) at the end of
 -- every home page refresh, so we hook that and rearrange the cards it just laid
@@ -11,11 +12,12 @@
 -- None of this is a public API, so a DJ update can break it. If that happens we
 -- leave DJ's layout alone and print a message once. Things we depend on:
 --   FDJ (ForeverDungeonJournal_NS): UpdateRPGHeader, ApplyRPGCard,
---     DungeonNavList, RefreshHomeCards
+--     DungeonNavList, RefreshHomeCards, HiddenDungeons, ShownDungeons,
+--     IsDungeonLocked
 --   journal frame: homePanel, homeScroll, homeCardsContent,
 --     languageSelectorButton, hideDungeonsButton
 --   cards: dungeonName, title, meta, counts, art, topShade, coverBorder,
---     hiddenText, comingSoon, rpgPage.questCount
+--     hiddenText, comingSoon, editOverlay, rpgPage.questCount
 --
 -- ****************************************************************************
 -- Hey Exehn, if you're reading this: thanks for DungeonJournal. If you ever
@@ -113,6 +115,12 @@ local TEXT = {
         koKR = "던전 목록을 정렬할 수 없습니다 (DungeonJournal이 변경되었을 수 있습니다):",
         zhCN = "无法排列地下城列表（DungeonJournal 可能已更改）：",
         zhTW = "無法排列地城列表（DungeonJournal 可能已變更）：",
+    },
+    -- Right-click menu on a dungeon card. Wording follows DJ's "Hide Dungeons".
+    hide = {
+        enUS = "Hide dungeon", deDE = "Dungeon ausblenden", frFR = "Masquer le donjon",
+        esES = "Ocultar mazmorra", itIT = "Nascondi spedizione", ptBR = "Ocultar masmorra",
+        ruRU = "Скрыть подземелье", koKR = "던전 숨기기", zhCN = "隐藏地下城", zhTW = "隱藏地城",
     },
     -- Chat message when the old DungeonJournalEnhanced folder is also
     -- installed. The folder path goes after it.
@@ -407,6 +415,128 @@ local function ReapplyRPG(card)
     if FDJ.ApplyRPGCard then pcall(FDJ.ApplyRPGCard, card, card.dungeonName, lastExtra) end
 end
 
+-- Right-click menu
+
+local function ClickSound()
+    if PlaySound and SOUNDKIT and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON then
+        pcall(PlaySound, SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+    end
+end
+
+-- Same as clicking a shown card in Hide Dungeons mode (the card's OnClick in
+-- DJ): hidden by hand, and no longer kept shown past an auto-hide option.
+-- Hide Dungeons brings it back.
+local function HideDungeon(name)
+    FDJ.HiddenDungeons()[name] = true
+    local shown = FDJ.ShownDungeons and FDJ.ShownDungeons()
+    if type(shown) == "table" then shown[name] = nil end
+    ClickSound()
+    GameTooltip:Hide()
+    if FDJ.RefreshHomeCards then pcall(FDJ.RefreshHomeCards) end
+end
+
+-- Not in Hide Dungeons mode (a left-click already does it there), and not
+-- RPG Mode's locked dungeons, which DJ never lets you hide.
+local function CanHide(card)
+    if type(card.dungeonName) ~= "string" or type(FDJ.HiddenDungeons) ~= "function" then return false end
+    if card.editOverlay and card.editOverlay:IsShown() then return false end
+    if FDJ.IsDungeonLocked and FDJ.IsDungeonLocked(card.dungeonName) then return false end
+    return true
+end
+
+local function MouseDown()
+    if not IsMouseButtonDown then return false end
+    return IsMouseButtonDown("LeftButton") or IsMouseButtonDown("RightButton")
+        or IsMouseButtonDown("MiddleButton")
+end
+
+-- Styled like DJ's own right-click menu on loot (Systems/Favourites.lua): a
+-- dark box, gold tooltip border, one row with the quest log highlight.
+local menu
+local function BuildMenu()
+    menu = CreateFrame("Frame", "DungeonJournalEnhancedCardMenu", UIParent, "BackdropTemplate")
+    menu:SetFrameStrata("TOOLTIP")
+    menu:SetClampedToScreen(true)
+    -- Eat clicks on the border so they don't land on the card underneath.
+    menu:EnableMouse(true)
+    menu:SetBackdrop({
+        bgFile = WHITE,
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        edgeSize = 12,
+        insets = { left = 3, right = 3, top = 3, bottom = 3 },
+    })
+    menu:SetBackdropColor(0.055, 0.045, 0.035, 0.98)
+    menu:SetBackdropBorderColor(0.52, 0.42, 0.24, 1)
+    menu:Hide()
+    -- Escape closes it.
+    if UISpecialFrames then table.insert(UISpecialFrames, menu:GetName()) end
+
+    local button = CreateFrame("Button", nil, menu)
+    button:SetPoint("TOPLEFT", 4, -4)
+    button:SetPoint("BOTTOMRIGHT", -4, 4)
+    button:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+    button.text = button:CreateFontString(nil, "OVERLAY", "ForeverDJ_GameFontHighlight")
+    button.text:SetPoint("LEFT", 9, 0)
+    button.text:SetJustifyH("LEFT")
+    button:SetScript("OnClick", function()
+        local name = menu.dungeonName
+        menu:Hide()
+        if name then HideDungeon(name) end
+    end)
+    menu.button = button
+
+    -- Closes on a click anywhere else, once that click is let go. Closing on
+    -- the press would hide the button before its own click goes through (DJ
+    -- ran into the same thing). Also closes when the card goes away (journal
+    -- closed, dungeon opened) or DJ reuses it for another dungeon.
+    menu:SetScript("OnUpdate", function(self)
+        local owner = self.owner
+        if not (owner and owner:IsVisible() and owner.dungeonName == self.dungeonName) then
+            self:Hide()
+            return
+        end
+        local down = MouseDown()
+        if not self.armed then
+            -- Wait until the right-click that opened it is let go.
+            if not down then self.armed = true end
+            return
+        end
+        if down then
+            self.sawDown = true
+        elseif self.sawDown then
+            self.sawDown = false
+            if not self:IsMouseOver() then self:Hide() end
+        end
+    end)
+end
+
+-- Opens at the cursor, like the game's right-click menus.
+local function ShowCardMenu(card)
+    if not menu then BuildMenu() end
+    menu.owner, menu.dungeonName = card, card.dungeonName
+    menu.armed, menu.sawDown = false, false
+    local text = menu.button.text
+    text:SetText(Text("hide"))
+    menu:SetSize(math.max(120, math.ceil((text:GetStringWidth() or 0) + 33)), 30)
+    local scale = UIParent:GetEffectiveScale()
+    local x, y = GetCursorPosition()
+    menu:ClearAllPoints()
+    menu:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x / scale, y / scale)
+    menu:Show()
+end
+
+-- DJ's cards only listen for left clicks, so a right-click never reaches its
+-- OnClick (it would open the dungeon). OnMouseUp still sees it.
+local function HookCardMenu(card)
+    if card.fdjMenu then return end
+    card.fdjMenu = true
+    card:HookScript("OnMouseUp", function(self, button)
+        if button == "RightButton" and self:IsMouseOver() and CanHide(self) then
+            ShowCardMenu(self)
+        end
+    end)
+end
+
 -- Home page
 
 local function SetScrollGutter(scroll, needsScroll)
@@ -498,6 +628,7 @@ local function Arrange(frame)
     for _, child in ipairs({ content:GetChildren() }) do
         if child:IsShown() and type(child.dungeonName) == "string"
             and child.title and child.meta and child.counts and child.art then
+            HookCardMenu(child)
             Remember(child)
             cards[#cards + 1] = child
             names[#names + 1] = child.dungeonName
@@ -550,12 +681,6 @@ local function ShowTip(b)
     GameTooltip:SetOwner(b, "ANCHOR_BOTTOM")
     GameTooltip:SetText(Text(b.fdjTip()), 1, 0.82, 0)
     GameTooltip:Show()
-end
-
-local function ClickSound()
-    if PlaySound and SOUNDKIT and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON then
-        pcall(PlaySound, SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
-    end
 end
 
 -- Small square button styled like DJ's other header buttons. Contents go on
