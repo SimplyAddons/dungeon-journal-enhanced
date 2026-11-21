@@ -27,4 +27,4 @@ DungeonJournal updates often. If an update changes something this addon relies o
 
 ## Hey Exehn
 
-Thanks for DungeonJournal. If you ever want any of this in DungeonJournal itself, or want a proper hook so this addon doesn't depend on your internals, I'm happy to collaborate whenever you are. Open an issue at [github.com/SimplyAddons/dungeon-journal-enhanced](https://github.com/SimplyAddons/dungeon-journal-enhanced) or message me on CurseForge.
+Thanks for DungeonJournal. If you ever want any of this in DungeonJournal itself, or want a proper hook so this addon doesn't depend on your internals, I'm happy to collaborate whenever you are - message me on CurseForge.
