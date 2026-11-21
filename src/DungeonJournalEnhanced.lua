@@ -24,8 +24,20 @@
 -- https://github.com/SimplyAddons/dungeon-journal-enhanced
 -- ****************************************************************************
 
+local ADDON_NAME = ...
+
 local FDJ = _G.ForeverDungeonJournal_NS
 if type(FDJ) ~= "table" then return end
+
+-- 1.0.0 was installed as DungeonJournalEnhanced. If that folder is still
+-- around it loads first (alphabetical), and running both would double every
+-- button, so this copy stays off and says why once you log in.
+local OLD_FOLDER = "DungeonJournalEnhanced"
+local function OldCopyLoaded()
+    if ADDON_NAME == OLD_FOLDER then return false end
+    local isLoaded = (C_AddOns and C_AddOns.IsAddOnLoaded) or _G.IsAddOnLoaded
+    return isLoaded and isLoaded(OLD_FOLDER) and true or false
+end
 
 local ROW_HEIGHT = 36 -- list row
 local ROW_GAP = 6
@@ -102,6 +114,20 @@ local TEXT = {
         zhCN = "无法排列地下城列表（DungeonJournal 可能已更改）：",
         zhTW = "無法排列地城列表（DungeonJournal 可能已變更）：",
     },
+    -- Chat message when the old DungeonJournalEnhanced folder is also
+    -- installed. The folder path goes after it.
+    oldCopy = {
+        enUS = "An old copy of this addon is still installed, so this one is turned off. Delete this folder and reload:",
+        deDE = "Eine alte Kopie dieses Addons ist noch installiert, deshalb ist diese ausgeschaltet. Lösche diesen Ordner und lade neu:",
+        frFR = "Une ancienne copie de cet addon est encore installée, celle-ci est donc désactivée. Supprimez ce dossier puis rechargez :",
+        esES = "Todavía hay una copia antigua de este addon instalada, así que esta está desactivada. Borra esta carpeta y recarga:",
+        itIT = "È ancora installata una vecchia copia di questo addon, quindi questa è disattivata. Elimina questa cartella e ricarica:",
+        ptBR = "Uma cópia antiga deste addon ainda está instalada, então esta está desligada. Apague esta pasta e recarregue:",
+        ruRU = "Старая копия этого аддона всё ещё установлена, поэтому эта отключена. Удалите эту папку и перезагрузите интерфейс:",
+        koKR = "이 애드온의 이전 사본이 아직 설치되어 있어 이 애드온은 꺼져 있습니다. 이 폴더를 삭제하고 UI를 다시 불러오세요:",
+        zhCN = "此插件的旧版本仍然安装着，因此本插件已关闭。请删除此文件夹并重载界面：",
+        zhTW = "此插件的舊版本仍然安裝著，因此本插件已關閉。請刪除此資料夾並重新載入介面：",
+    },
 }
 
 -- Sort-by-name button label for non-Latin alphabets.
@@ -119,6 +145,19 @@ local function Text(which)
     return TEXT[which][Language()] or TEXT[which].enUS
 end
 
+local function Print(message)
+    print("|cffffd100[Dungeon Journal Enhanced]|r " .. message)
+end
+
+if OldCopyLoaded() then
+    local f = CreateFrame("Frame")
+    f:RegisterEvent("PLAYER_LOGIN")
+    f:SetScript("OnEvent", function()
+        Print(Text("oldCopy") .. " Interface\\AddOns\\" .. OLD_FOLDER)
+    end)
+    return
+end
+
 -- pcall that prints the first error once per session. Most likely cause is a
 -- DJ update changing something we rely on.
 local warned
@@ -126,7 +165,7 @@ local function Safe(fn, ...)
     local ok, err = pcall(fn, ...)
     if not ok and not warned then
         warned = true
-        print("|cffffd100[Dungeon Journal Enhanced]|r " .. Text("broken") .. " " .. tostring(err))
+        Print(Text("broken") .. " " .. tostring(err))
     end
     return ok
 end
