@@ -1,0 +1,15 @@
+package-as: DungeonJournalEnhanced
+
+ignore:
+  - .github
+  - .vscode
+  - .gitignore
+  - README.md
+  - LICENSE
+
+required-dependencies:
+  - dungeonjournal
+
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown

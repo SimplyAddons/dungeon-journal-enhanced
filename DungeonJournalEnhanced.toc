@@ -1,0 +1,12 @@
+## Interface: 16001
+## Title: Dungeon Journal Enhanced
+## Notes: Enhancements for Forever Dungeon Journal.
+## Author: SimplyAddons
+## Version: @project-version@
+## Dependencies: ForeverDungeonJournal
+## SavedVariables: DungeonJournalEnhancedDB
+## X-Category: Interface Enhancements
+## X-License: MIT
+## X-Curse-Project-ID: 1821689
+
+src\DungeonJournalEnhanced.lua
