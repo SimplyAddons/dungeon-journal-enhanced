@@ -3,6 +3,7 @@
 ## Notes: Enhancements for Forever Dungeon Journal.
 ## Author: SimplyAddons
 ## Version: @project-version@
+## IconTexture: Interface\Icons\INV_Misc_Book_09
 ## Dependencies: ForeverDungeonJournal
 ## SavedVariables: DungeonJournalEnhancedDB
 ## X-Category: Interface Enhancements
