@@ -19,12 +19,6 @@
 --   cards: dungeonName, title, meta, counts, art, topShade, coverBorder,
 --     hiddenText, comingSoon, editOverlay, rpgPage.questCount
 --
--- ****************************************************************************
--- Hey Exehn, if you're reading this: thanks for DungeonJournal. If you ever
--- want any of this in DJ itself, or want a proper hook so this doesn't depend
--- on your internals, I'm happy to collaborate whenever you are.
--- https://github.com/SimplyAddons/dungeon-journal-enhanced
--- ****************************************************************************
 
 local ADDON_NAME = ...
 
